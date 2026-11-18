@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>NEON RUNNER — START</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --fg: #e8faff;
+      --cyan: #00f0ff;
+      --pink: #ff2a6d;
+      --bg: #05010f;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: "Trebuchet MS", system-ui, sans-serif;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+    }
+
+    #menu {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+      background: radial-gradient(ellipse at 50% 40%, #150a2a 0%, #05010f 70%, #000 100%);
+      overflow: hidden;
+    }
+
+    #menu::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 200%; height: 200%;
+      background-image:
+        linear-gradient(rgba(0, 240, 255, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 42, 109, 0.05) 1px, transparent 1px);
+      background-size: 70px 70px;
+      transform: perspective(500px) rotateX(55deg);
+      transform-origin: center 65%;
+      animation: gridScroll 18s linear infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes gridScroll {
+      0%   { transform: perspective(500px) rotateX(55deg) translateY(0); }
+      100% { transform: perspective(500px) rotateX(55deg) translateY(70px); }
+    }
+
+    .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.18;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .orb-1 { width: 480px; height: 480px; background: #00f0ff; top: -15%; left: -10%; animation: orbFloat 14s ease-in-out infinite; }
+    .orb-2 { width: 420px; height: 420px; background: #ff2a6d; bottom: -18%; right: -8%; animation: orbFloat 18s ease-in-out infinite reverse; }
+    .orb-3 { width: 280px; height: 280px; background: #b04dff; top: 45%; right: 22%; animation: orbFloat 22s ease-in-out infinite; }
+
+    @keyframes orbFloat {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33%      { transform: translate(40px, -30px) scale(1.1); }
+      66%      { transform: translate(-25px, 25px) scale(0.92); }
+    }
+
+    .content {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 700px;
+      width: 90%;
+    }
+
+    .logo {
+      display: block;
+      max-width: min(80vw, 440px);
+      width: 100%;
+      height: auto;
+      margin: 0 0 10px;
+      filter: drop-shadow(0 0 18px var(--cyan)) drop-shadow(0 0 40px var(--pink));
+      animation: logoPulse 3s ease-in-out infinite;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    @keyframes logoPulse {
+      0%, 100% { filter: drop-shadow(0 0 18px var(--cyan)) drop-shadow(0 0 40px var(--pink)); }
+      50%      { filter: drop-shadow(0 0 28px var(--cyan)) drop-shadow(0 0 70px var(--pink)); }
+    }
+
+    .subtitle {
+      font-size: clamp(12px, 3vw, 17px);
+      letter-spacing: clamp(4px, 1vw, 9px);
+      color: #88aacc;
+      margin-top: 6px;
+      text-transform: uppercase;
+      opacity: 0.85;
+    }
+
+    .underline {
+      width: 130px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      margin: 16px auto 0;
+      box-shadow: 0 0 20px var(--cyan);
+      animation: underlinePulse 2s ease-in-out infinite;
+    }
+
+    @keyframes underlinePulse {
+      0%, 100% { width: 90px; opacity: 0.6; }
+      50%      { width: 170px; opacity: 1; }
+    }
+
+    /* Map selection */
+    .map-label {
+      margin-top: 28px;
+      font-size: 11px;
+      letter-spacing: 4px;
+      color: #6688aa;
+      text-transform: uppercase;
+    }
+
+    .map-select {
+      display: flex;
+      gap: 14px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .map-card {
+      position: relative;
+      width: 150px;
+      height: 90px;
+      border: 2px solid rgba(0, 240, 255, 0.25);
+      border-radius: 10px;
+      background: rgba(0, 15, 25, 0.7);
+      cursor: pointer;
+      transition: all 0.25s ease;
+      overflow: hidden;
+      backdrop-filter: blur(4px);
+    }
+
+    .map-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.55;
+      transition: opacity 0.25s;
+      pointer-events: none;
+    }
+
+    .map-card .map-name {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 5px 0;
+      font-size: 10px;
+      letter-spacing: 2px;
+      font-weight: bold;
+      color: var(--cyan);
+      text-transform: uppercase;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
+      pointer-events: none;
+    }
+
+    .map-card:hover {
+      border-color: rgba(0, 240, 255, 0.7);
+      transform: translateY(-2px);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+    }
+
+    .map-card:hover img { opacity: 0.8; }
+
+    .map-card.selected {
+      border-color: var(--cyan);
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.55), inset 0 0 20px rgba(0, 240, 255, 0.1);
+    }
+
+    .map-card.selected img { opacity: 1; }
+
+    .map-card.selected .map-name {
+      color: #fff;
+      text-shadow: 0 0 10px var(--cyan);
+    }
+
+    .menu-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 28px;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .menu-btn {
+      position: relative;
+      background: rgba(0, 20, 30, 0.7);
+      border: 2px solid rgba(0, 240, 255, 0.5);
+      border-radius: 10px;
+      padding: 18px 28px;
+      color: var(--cyan);
+      font-family: inherit;
+      font-size: clamp(15px, 4vw, 20px);
+      font-weight: bold;
+      letter-spacing: 3px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      backdrop-filter: blur(6px);
+      overflow: hidden;
+      text-transform: uppercase;
+    }
+
+    .menu-btn::before {
+      content: '';
+      position: absolute;
+      top: 0; left: -100%;
+      width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.2), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .menu-btn:hover::before { left: 100%; }
+
+    .menu-btn:hover {
+      background: rgba(0, 240, 255, 0.14);
+      border-color: var(--cyan);
+      box-shadow: 0 0 30px rgba(0, 240, 255, 0.5), inset 0 0 25px rgba(0, 240, 255, 0.08);
+      transform: translateY(-2px) scale(1.02);
+    }
+
+    .menu-btn:active { transform: scale(0.97); }
+
+    .menu-btn.primary {
+      border-color: var(--cyan);
+      background: rgba(0, 240, 255, 0.1);
+      box-shadow: 0 0 22px rgba(0, 240, 255, 0.25);
+    }
+
+    .menu-btn.primary:hover {
+      background: rgba(0, 240, 255, 0.2);
+      box-shadow: 0 0 42px rgba(0, 240, 255, 0.6);
+    }
+
+    .menu-btn .icon { margin-right: 10px; font-size: 1.1em; }
+
+    .secondary-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .small-btn {
+      background: transparent;
+      border: 1px solid rgba(136, 170, 204, 0.4);
+      border-radius: 20px;
+      padding: 8px 20px;
+      color: #88aacc;
+      font-family: inherit;
+      font-size: 11px;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .small-btn:hover {
+      color: var(--cyan);
+      border-color: var(--cyan);
+      background: rgba(0, 240, 255, 0.08);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: rgba(8, 2, 20, 0.97);
+      border: 2px solid var(--cyan);
+      border-radius: 16px;
+      padding: 34px 40px;
+      text-align: center;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 0 60px rgba(0, 240, 255, 0.25);
+      animation: modalIn 0.3s ease-out;
+    }
+
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.9) translateY(20px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal h3 {
+      color: var(--cyan);
+      font-size: 18px;
+      letter-spacing: 3px;
+      margin-bottom: 18px;
+      text-shadow: 0 0 15px var(--cyan);
+    }
+
+    .modal p {
+      color: #aaccdd;
+      font-size: 13px;
+      line-height: 2;
+      letter-spacing: 1px;
+    }
+
+    .modal .btn-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 24px;
+      flex-wrap: wrap;
+    }
+
+    .modal .btn {
+      background: transparent;
+      color: var(--cyan);
+      border: 2px solid var(--cyan);
+      border-radius: 8px;
+      padding: 11px 26px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .modal .btn:hover {
+      background: rgba(0, 240, 255, 0.15);
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.5);
+      transform: scale(1.03);
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 16px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      color: #334;
+      font-size: 10px;
+      letter-spacing: 1px;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    @media (max-width: 600px) {
+      .menu-btn { padding: 14px 20px; letter-spacing: 2px; }
+      .modal { padding: 24px 20px; }
+      .logo { max-width: min(88vw, 340px); }
+      .map-card { width: 130px; height: 78px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div id="menu">
+    <div class="content">
+      <img src="logo.png" alt="Neon Runner" class="logo" />
+      <div class="subtitle">Infinite Runner</div>
+      <div class="underline"></div>
+
+      <!-- MAP SELECTION -->
+      <div class="map-label">Select Map</div>
+      <div class="map-select" id="mapSelect">
+        <div class="map-card selected" data-map="classic">
+          <img src="logo.png" alt="Classic map" />
+          <div class="map-name">Classic</div>
+        </div>
+        <div class="map-card" data-map="tunnel">
+          <img src="tunnel.png" alt="Tunnel map" />
+          <div class="map-name">Tunnel</div>
+        </div>
+      </div>
+
+      <div class="menu-buttons">
+        <button class="menu-btn primary" id="btnPlay">
+          <span class="icon">▶</span> Play
+        </button>
+        <button class="menu-btn" id="btnPractice">
+          <span class="icon">🎯</span> Practice
+        </button>
+      </div>
+
+      <div class="secondary-actions">
+        <button class="small-btn" id="btnControls">CONTROLS</button>
+        <button class="small-btn" id="btnAbout">ABOUT</button>
+      </div>
+    </div>
+
+    <div class="footer">NEON RUNNER · THREE.JS</div>
+  </div>
+
+  <!-- Controls Modal -->
+  <div class="modal-overlay" id="controlsModal">
+    <div class="modal">
+      <h3>🎮 CONTROLS</h3>
+      <p style="text-align:left;">
+        <span style="color:var(--cyan); font-weight:bold;">← → / A D</span> — Switch lanes<br>
+        <span style="color:var(--cyan); font-weight:bold;">Space / ↑</span> — Jump (again mid-air = double jump)<br>
+        <span style="color:var(--cyan); font-weight:bold;">Shift</span> — Speed up<br>
+        <span style="color:var(--cyan); font-weight:bold;">Esc</span> — Pause / switch level<br>
+        <span style="color:var(--cyan); font-weight:bold;">Touch</span> — Tap left/right, swipe up to jump
+      </p>
+      <div class="btn-row">
+        <button class="btn" id="controlsCloseBtn">GOT IT</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- About Modal -->
+  <div class="modal-overlay" id="aboutModal">
+    <div class="modal">
+      <h3>ℹ️ ABOUT</h3>
+      <p>
+        A neon-lit infinite runner. Dodge red blocks, grab cyan orbs,
+        survive 50 levels of escalating difficulty. Watch out for the eclipse —
+        visibility drops and the moon swallows the sun.
+      </p>
+      <p style="margin-top:10px;">
+        <b style="color:var(--cyan)">CLASSIC</b> — the open neon grid.<br>
+        <b style="color:var(--cyan)">TUNNEL</b> — a textured tunnel map using <code>tunnel.png</code>.
+      </p>
+      <div class="btn-row">
+        <button class="btn" id="aboutCloseBtn">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // MENU LOGIC — launches game.html (Neon Runner)
+    // ============================================================
+
+    const controlsModal = document.getElementById('controlsModal');
+    const aboutModal = document.getElementById('aboutModal');
+
+    // Selected map: 'classic' or 'tunnel' (persisted)
+    let selectedMap = 'classic';
+    try { selectedMap = localStorage.getItem('neonRunnerMap') || 'classic'; } catch (e) {}
+
+    function closeAllModals() {
+      controlsModal.classList.remove('active');
+      aboutModal.classList.remove('active');
+    }
+
+    function syncMapSelection() {
+      document.querySelectorAll('.map-card').forEach(card => {
+        card.classList.toggle('selected', card.dataset.map === selectedMap);
+      });
+    }
+
+    // Map card click
+    document.querySelectorAll('.map-card').forEach(card => {
+      card.addEventListener('click', () => {
+        selectedMap = card.dataset.map;
+        try { localStorage.setItem('neonRunnerMap', selectedMap); } catch (e) {}
+        syncMapSelection();
+      });
+    });
+
+    syncMapSelection();
+
+    function launchGame(mode) {
+      // mode = 'play' or 'practice'
+      window.location.href = 'game.html?mode=' + mode + '&map=' + selectedMap;
+    }
+
+    document.getElementById('btnPlay').addEventListener('click', () => {
+      launchGame('play');
+    });
+
+    document.getElementById('btnPractice').addEventListener('click', () => {
+      launchGame('practice');
+    });
+
+    document.getElementById('btnControls').addEventListener('click', () => {
+      closeAllModals();
+      controlsModal.classList.add('active');
+    });
+
+    document.getElementById('controlsCloseBtn').addEventListener('click', () => {
+      controlsModal.classList.remove('active');
+    });
+
+    document.getElementById('btnAbout').addEventListener('click', () => {
+      closeAllModals();
+      aboutModal.classList.add('active');
+    });
+
+    document.getElementById('aboutCloseBtn').addEventListener('click', () => {
+      aboutModal.classList.remove('active');
+    });
+
+    [controlsModal, aboutModal].forEach(modal => {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.remove('active');
+      });
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeAllModals();
+    });
+  </script>
+</body>
+</html>

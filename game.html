@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Neon Runner</title>
+<style>
+  :root { box-sizing: border-box; color-scheme: dark; --fg:#e8faff; --cyan:#00f0ff; --pink:#ff2a6d; --bg:#05010f;
+    padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow:hidden; font-family:"Trebuchet MS", system-ui, sans-serif; touch-action:none; user-select:none; }
+  canvas { position:fixed; inset:0; width:100%; height:100%; display:block; }
+  #hud { position:fixed; top:env(safe-area-inset-top, 0px); left:0; right:0; display:flex; justify-content:space-between; padding:14px 18px; gap:8px; font-size:clamp(11px,3.2vw,20px); letter-spacing:2px; text-shadow:0 0 10px var(--cyan); pointer-events:none; }
+  #msg { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:rgba(5,1,15,.55); padding:20px; }
+  h1 { margin:0 0 10px; font-size:clamp(40px,10vw,76px); letter-spacing:6px; color:var(--cyan); text-shadow:0 0 18px var(--cyan), 0 0 40px var(--pink); }
+  p { margin:6px 0; font-size:clamp(14px,3.5vw,18px); opacity:.9; }
+  #home, #pause { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; background:rgba(5,1,15,.7); padding:20px; }
+  #chars { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin:10px 0 6px; }
+  .ch { width:78px; height:78px; border:2px solid #334; border-radius:10px; background:rgba(255,255,255,.04); color:var(--fg); font-size:11px; letter-spacing:1px; margin:0; padding:6px; box-shadow:none; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
+  .ch.sel { border-color:var(--cyan); box-shadow:0 0 14px var(--cyan); }
+  .dot { width:26px; height:26px; border-radius:50%; }
+  .row { display:flex; gap:12px; justify-content:center; }
+  button.alt { background:transparent; color:var(--cyan); border:2px solid var(--cyan); box-shadow:none; }
+  #ctl { position:fixed; left:0; right:0; bottom:calc(14px + env(safe-area-inset-bottom, 0px)); display:none; justify-content:center; gap:12px; flex-wrap:wrap; }
+  #ctl button { margin:0; padding:8px 16px; font-size:14px; }
+  p.small { font-size:12px; opacity:.7; }
+  #warn { position:fixed; top:22%; left:0; right:0; text-align:center; font-size:clamp(20px,6vw,40px); letter-spacing:4px; font-weight:bold; color:var(--pink); text-shadow:0 0 18px currentColor; pointer-events:none; opacity:0; }
+  button { margin-top:18px; padding:12px 34px; font-size:20px; letter-spacing:3px; color:var(--bg); background:var(--cyan); border:0; border-radius:6px; box-shadow:0 0 22px var(--cyan); cursor:pointer; }
+
+  .logo {
+    display: block;
+    max-width: min(80vw, 420px);
+    width: 100%;
+    height: auto;
+    margin: 0 0 12px;
+    filter: drop-shadow(0 0 18px var(--cyan)) drop-shadow(0 0 40px var(--pink));
+    animation: logoPulse 3s ease-in-out infinite;
+    pointer-events: none;
+    user-select: none;
+  }
+  @keyframes logoPulse {
+    0%, 100% { filter: drop-shadow(0 0 18px var(--cyan)) drop-shadow(0 0 40px var(--pink)); }
+    50%      { filter: drop-shadow(0 0 28px var(--cyan)) drop-shadow(0 0 70px var(--pink)); }
+  }
+  .logo.small { max-width: min(60vw, 280px); margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<div id="hud"><span id="score">SCORE 0</span><span id="lvl">LVL 1 · 0 km/h</span><span id="best">BEST 0</span></div>
+<div id="warn"></div>
+<div id="home">
+  <img src="logo.png" alt="Neon Runner" class="logo" />
+  <p>Choose your ship</p>
+  <div id="chars"></div>
+  <div class="row"><button id="play">PLAY</button><button id="prac" class="alt">PRACTICE</button></div>
+  <p class="small">Practice: set a spawn point and respawn there whenever you crash</p>
+  <p class="small">[Shift] = speed up · [Esc] = pause / switch level</p>
+</div>
+<div id="ctl"><p class="small" style="flex-basis:100%;margin:0;text-align:center">[Shift] = speed up · [Esc] = pause / switch level</p><button id="menuBtn" class="alt">MENU</button><button id="spawnBtn">SET SPAWN POINT</button></div>
+<div id="pause" style="display:none">
+  <h1>PAUSED</h1>
+  <div id="lvlBox"><p>Switch level: <b id="lvlVal">1</b></p><input type="range" id="lvlSel" min="1" max="50" value="1" style="width:min(80vw,360px)"></div>
+  <div class="row"><button id="resume">RESUME</button><button id="homeP" class="alt">HOME</button></div>
+  <p class="small">[Shift] = speed up · [Esc] = pause / switch level</p>
+</div>
+<div id="msg" style="display:none">
+  <img src="logo.png" alt="Neon Runner" class="logo small" id="msgLogo" />
+  <h1 id="title">NEON RUNNER</h1>
+  <p id="sub">Dodge the red blocks. Grab the cyan orbs.</p>
+  <p>← → or A / D to switch lanes · Space or ↑ to jump, press again in the air to double jump</p><p>On touch: tap left or right side, swipe up to jump (again in the air to double jump)</p><p>50 levels: easy at the start, medium by level 15, ultra hard at level 50</p>
+  <button id="go">START</button>
+  <button id="homeb" class="alt">HOME</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script>
+(function () {
+  // ============================================================
+  // MENU INTEGRATION — mode + map from URL
+  // ============================================================
+  var params = new URLSearchParams(location.search);
+  var launchMode = params.get('mode') || '';
+  var mapType = params.get('map') || 'classic';
+
+  var LANES = [-2, 0, 2];
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb); // fallback normal-sky blue
+  var fog = scene.fog = new THREE.Fog(0x87ceeb, 20, 95);
+  var sky = new THREE.Group(); sky.position.set(0, 10, -110); scene.add(sky);
+  var sun = new THREE.Mesh(new THREE.CircleGeometry(9, 40), new THREE.MeshBasicMaterial({ color: 0xffa030, fog: false }));
+  var corona = new THREE.Mesh(new THREE.RingGeometry(9, 13, 40), new THREE.MeshBasicMaterial({ color: 0xff2a6d, transparent: true, opacity: 0, fog: false }));
+  var moon = new THREE.Mesh(new THREE.CircleGeometry(9.2, 40), new THREE.MeshBasicMaterial({ color: 0x000000, fog: false }));
+  moon.position.set(-26, 0, 0.3); corona.position.z = 0.1;
+  sky.add(sun, corona, moon);
+  sky.visible = false; // replaced by sky.png backdrop
+
+  var camera = new THREE.PerspectiveCamera(70, 1, 0.1, 200);
+  camera.position.set(0, 2.4, 5);
+  camera.lookAt(0, 0.8, -12);
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding; // proper colors for PBR glb models
+  // Lights so textured PBR models (spaceship.glb) actually render
+  scene.add(new THREE.HemisphereLight(0xbfe8ff, 0x1a0530, 1.1));
+  var sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  sunLight.position.set(4, 10, 6);
+  scene.add(sunLight);
+  document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+  function resize() {
+    renderer.setSize(innerWidth, innerHeight);
+    camera.aspect = innerWidth / innerHeight;
+    camera.fov = camera.aspect < 0.8 ? 90 : 70;
+    camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', resize); resize();
+
+  // ============================================================
+  // TEXTURES
+  // ============================================================
+  // Classic floor (procedural canvas grid)
+  var c = document.createElement('canvas'); c.width = c.height = 128;
+  var g = c.getContext('2d');
+  g.fillStyle = '#0a0220'; g.fillRect(0, 0, 128, 128);
+  for (var n = 0; n < 240; n++) { g.fillStyle = 'rgba(' + (Math.random() < 0.5 ? '0,240,255' : '255,42,109') + ',' + (Math.random() * 0.3) + ')'; g.fillRect(Math.random() * 128, Math.random() * 128, 2, 2); }
+  var gr = g.createLinearGradient(0, 0, 0, 128); gr.addColorStop(0, 'rgba(0,240,255,0)'); gr.addColorStop(0.5, 'rgba(0,240,255,0.2)'); gr.addColorStop(1, 'rgba(0,240,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  g.fillStyle = 'rgba(0,240,255,0.55)'; g.fillRect(60, 10, 8, 40);
+  g.strokeStyle = '#ff2a6d'; g.lineWidth = 4; g.strokeRect(0, 0, 128, 128);
+  var classicTexture = new THREE.CanvasTexture(c);
+  classicTexture.wrapS = classicTexture.wrapT = THREE.RepeatWrapping;
+  classicTexture.repeat.set(3, 40);
+
+  // Tunnel wall texture
+  var tunnelTexture = new THREE.TextureLoader().load('tunnel.png');
+  tunnelTexture.wrapS = tunnelTexture.wrapT = THREE.RepeatWrapping;
+  tunnelTexture.repeat.set(3, 40);
+
+  // Tunnel floor texture
+  var tunnelFloorTexture = new THREE.TextureLoader().load('tunnel_floor.png');
+  tunnelFloorTexture.wrapS = tunnelFloorTexture.wrapT = THREE.RepeatWrapping;
+  tunnelFloorTexture.repeat.set(3, 40);
+
+  // Normal sky texture (Classic map backdrop)
+  var skyTexture = new THREE.TextureLoader().load('sky.png');
+  skyTexture.wrapS = THREE.RepeatWrapping;
+  skyTexture.wrapT = THREE.ClampToEdgeWrapping;
+  skyTexture.repeat.set(2, 1);
+
+  // Active scroll texture
+  var tex = classicTexture;
+
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 140), new THREE.MeshBasicMaterial({ map: tex }));
+  floor.rotation.x = -Math.PI / 2; floor.position.z = -60;
+  scene.add(floor);
+
+  // Tunnel rings (classic only)
+  var rings = [];
+  for (var i = 0; i < 14; i++) {
+    var r = new THREE.Mesh(new THREE.TorusGeometry(6, 0.07, 6, 28),
+      new THREE.MeshBasicMaterial({ color: i % 2 ? 0x00f0ff : 0xff2a6d }));
+    r.position.set(0, 0, -i * 8);
+    scene.add(r); rings.push(r);
+  }
+
+  // ============================================================
+  // MAP THEME
+  // ============================================================
+  var tunnelMesh = null;
+  var skyPlane = null;
+
+  function applyMapTheme(type) {
+    if (type === 'tunnel') {
+      // Floor uses tunnel_floor.png
+      tex = tunnelFloorTexture;
+      floor.material.map = tunnelFloorTexture;
+      floor.material.color.setHex(0xffffff);
+      floor.material.needsUpdate = true;
+
+      // Tunnel walls
+      if (!tunnelMesh) {
+        var tunnelGeo = new THREE.CylinderGeometry(7, 7, 140, 32, 1, true);
+        tunnelGeo.rotateX(Math.PI / 2);
+        var tunnelMat = new THREE.MeshBasicMaterial({
+          map: tunnelTexture,
+          side: THREE.BackSide,
+          transparent: true,
+          opacity: 0.9
+        });
+        tunnelMesh = new THREE.Mesh(tunnelGeo, tunnelMat);
+        tunnelMesh.position.z = -60;
+        scene.add(tunnelMesh);
+      }
+      tunnelMesh.visible = true;
+
+      // Hide sky
+      if (skyPlane) skyPlane.visible = false;
+      sky.visible = false;
+      rings.forEach(function (r) { r.visible = false; });
+      scene.background = new THREE.Color(0x020008);
+      scene.fog = new THREE.Fog(0x020008, 12, 70);
+    } else {
+      // Classic
+      tex = classicTexture;
+      floor.material.map = classicTexture;
+      floor.material.color.setHex(0xffffff);
+      floor.material.needsUpdate = true;
+
+      if (tunnelMesh) tunnelMesh.visible = false;
+
+      // Normal sky backdrop plane
+      if (!skyPlane) {
+        skyPlane = new THREE.Mesh(
+          new THREE.PlaneGeometry(400, 200),
+          new THREE.MeshBasicMaterial({ map: skyTexture, fog: false, depthWrite: false })
+        );
+        skyPlane.position.set(0, 40, -180);
+        scene.add(skyPlane);
+      }
+      skyPlane.visible = true;
+
+      sky.visible = false; // sun/moon mesh replaced by sky.png
+      rings.forEach(function (r) { r.visible = true; });
+      scene.background = new THREE.Color(0x87ceeb); // matches sky.png average color
+      scene.fog = new THREE.Fog(0x87ceeb, 20, 95);
+      fog = scene.fog;
+    }
+  }
+
+  applyMapTheme(mapType);
+
+  // ============================================================
+  // PLAYER
+  // ============================================================
+  var ship = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.8, 4), new THREE.MeshBasicMaterial({ color: 0x0a0220 }));
+  body.rotation.x = -Math.PI / 2;
+  var edges = new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry), new THREE.LineBasicMaterial({ color: 0x00f0ff }));
+  edges.rotation.x = -Math.PI / 2;
+  var CHARS = [
+    { name: 'ALIEN', color: 0x7dff6a, fill: 0x0a2a08, glb: true },
+    { name: 'SHIP', color: 0x00f0ff, fill: 0x0a0220, rot: true, glb: true },
+    { name: 'DART', color: 0x00f0ff, fill: 0x0a0220, rot: true, geo: function () { return new THREE.ConeGeometry(0.6, 1.8, 4); } },
+    { name: 'CUBE', color: 0xff2a6d, fill: 0x2a0412, geo: function () { return new THREE.BoxGeometry(1, 1, 1); } },
+    { name: 'GEM', color: 0xffd000, fill: 0x2a1a00, geo: function () { return new THREE.OctahedronGeometry(0.8); } },
+    { name: 'ORB', color: 0x7dff6a, fill: 0x0a2a08, geo: function () { return new THREE.IcosahedronGeometry(0.75, 0); } }
+  ];
+  var charIdx = 0;
+  try { charIdx = +localStorage.getItem('neonRunnerChar') || 0; } catch (e) {}
+  function setChar(i) {
+    charIdx = i;
+    while (ship.children.length) ship.remove(ship.children[0]);
+    var ch = CHARS[i];
+    if (ch.glb) {
+      shipMixer = null;
+      addSpaceshipModel();
+    } else {
+      var geo = ch.geo();
+      var m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: ch.fill }));
+      var ed = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: ch.color }));
+      if (ch.rot) { m.rotation.x = -Math.PI / 2; ed.rotation.x = -Math.PI / 2; }
+      ship.add(m, ed);
+    }
+    try { localStorage.setItem('neonRunnerChar', i); } catch (e2) {}
+  }
+  // Load a glb ship model (alien.glb preferred, spaceship.glb fallback) and fit it inside the ship group
+  var shipMixer = null, shipAnimations = [], shipGltf = '';
+  function addSpaceshipModel() {
+    var loader = new THREE.GLTFLoader();
+    function useModel(gltf) {
+      var model = gltf.scene;
+      // auto-fit to ~2 units
+      var box = new THREE.Box3().setFromObject(model);
+      var size = box.getSize(new THREE.Vector3());
+      var scale = 2.2 / Math.max(size.x, size.y, size.z, 0.001);
+      model.scale.setScalar(scale);
+      box.setFromObject(model);
+      var center = box.getCenter(new THREE.Vector3());
+      model.position.sub(center); // center it
+      // glb models load facing the camera (+Z) — flip 180° so the nose faces down the track (-Z)
+      model.rotation.y = Math.PI;
+      ship.add(model);
+      // Play embedded glb animation if the model has one
+      if (gltf.animations && gltf.animations.length) {
+        shipMixer = new THREE.AnimationMixer(model);
+        gltf.animations.forEach(function (clip) { shipMixer.clipAction(clip).play(); });
+        shipAnimations = gltf.animations;
+      }
+      // engine glow only for spaceship.glb (no engines on the alien)
+      if (gltf === shipGltf) {
+        var glow = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10),
+          new THREE.MeshBasicMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.85 }));
+        glow.name = 'engineGlow';
+        glow.position.z = 0.9; // behind the ship (away from camera)
+        ship.add(glow);
+      }
+    }
+    loader.load('alien.glb', function (gltf) { shipGltf = 'alien'; useModel(gltf); }, undefined, function () {
+      // fallback: spaceship.glb
+      loader.load('spaceship.glb', function (gltf) { shipGltf = 'ship'; useModel(gltf); }, undefined, function () {
+        // last resort: old cone ship
+        var geo = new THREE.ConeGeometry(0.6, 1.8, 4);
+        var m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x0a0220 }));
+        m.rotation.x = -Math.PI / 2;
+        ship.add(m);
+      });
+    });
+  }
+  setChar(charIdx);
+  ship.position.set(0, 0.7, 0);
+  scene.add(ship);
+
+  var boxGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+  var boxEdge = new THREE.EdgesGeometry(boxGeo);
+  var bc = document.createElement('canvas'); bc.width = bc.height = 64;
+  var bg = bc.getContext('2d');
+  bg.fillStyle = '#2a0412'; bg.fillRect(0, 0, 64, 64); bg.fillStyle = '#ff2a6d';
+  for (var s0 = -64; s0 < 64; s0 += 16) { bg.beginPath(); bg.moveTo(s0, 64); bg.lineTo(s0 + 8, 64); bg.lineTo(s0 + 72, 0); bg.lineTo(s0 + 64, 0); bg.fill(); }
+  bg.strokeStyle = '#ff9ec0'; bg.lineWidth = 4; bg.strokeRect(2, 2, 60, 60);
+  var boxMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(bc) });
+  var boxLine = new THREE.LineBasicMaterial({ color: 0xff2a6d });
+  var triGeo = new THREE.ConeGeometry(0.85, 1.6, 3), triEdge = new THREE.EdgesGeometry(triGeo);
+  var triMat = new THREE.MeshBasicMaterial({ color: 0x3a0518 });
+  var diaGeo = new THREE.OctahedronGeometry(0.95), diaEdge = new THREE.EdgesGeometry(diaGeo);
+  var diaMat = new THREE.MeshBasicMaterial({ color: 0x1a0638 }), diaLine = new THREE.LineBasicMaterial({ color: 0xb04dff });
+  var sc = document.createElement('canvas'); sc.width = 256; sc.height = 128;
+  var sg = sc.getContext('2d');
+  sg.fillStyle = '#ffd23a'; sg.fillRect(0, 0, 256, 128);
+  sg.fillStyle = '#2a1500'; sg.strokeStyle = '#2a1500'; sg.lineWidth = 4;
+  for (var q = 0; q < 4; q++) {
+    var cx = 32 + q * 64;
+    sg.beginPath(); sg.arc(cx - 10, 52, 5, 0, 6.3); sg.fill();
+    sg.beginPath(); sg.arc(cx + 10, 52, 5, 0, 6.3); sg.fill();
+    sg.beginPath(); sg.arc(cx, 66, 16, 0.15 * Math.PI, 0.85 * Math.PI); sg.stroke();
+  }
+  var smileGeo = new THREE.SphereGeometry(0.85, 24, 16), smileMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc) });
+  function makeObs() {
+    var r = Math.random(), m;
+    if (r < 0.34) { m = new THREE.Mesh(triGeo, triMat); m.add(new THREE.LineSegments(triEdge, boxLine)); m.userData = { y: 0.8, spin: 2 }; }
+    else if (r < 0.68) { m = new THREE.Mesh(smileGeo, smileMat); m.userData = { y: 0.85, spin: 0 }; }
+    else { m = new THREE.Mesh(diaGeo, diaMat); m.add(new THREE.LineSegments(diaEdge, diaLine)); m.userData = { y: 0.95, spin: 3 }; }
+    return m;
+  }
+  var wallGeo = new THREE.BoxGeometry(6.4, 3.6, 1.5);
+  var wallEdge = new THREE.EdgesGeometry(wallGeo);
+  var wallMat = new THREE.MeshBasicMaterial({ color: 0x2a1a00 });
+  var wallLine = new THREE.LineBasicMaterial({ color: 0xffd000 });
+  var orbGeo = new THREE.SphereGeometry(0.45, 12, 12);
+  var orbMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+
+  // ============================================================
+  // GAME STATE
+  // ============================================================
+  var items = [], state = 'home', speed, dist, orbs, lane, nextSpawn, best = 0;
+  var bestSpeed = 0;
+  try { best = +localStorage.getItem('neonRunnerBest') || 0; bestSpeed = +localStorage.getItem('neonRunnerBestSpeed') || 0; } catch (e) {}
+  var $score = document.getElementById('score'), $best = document.getElementById('best'),
+      $msg = document.getElementById('msg'), $title = document.getElementById('title'),
+      $sub = document.getElementById('sub'), $go = document.getElementById('go'),
+      $msgLogo = document.getElementById('msgLogo');
+  $best.textContent = 'BEST ' + best;
+
+  var warnEl = document.getElementById('warn'), $lvl = document.getElementById('lvl');
+  var eph = 'none', ephT = 0, eclT = 20, dark = 0, lvl = 1, lvlT = 0, maxSp = 0, vy = 0, jy = 0, py = 0, jn = 0;
+  function bestTxt() { $best.textContent = 'BEST ' + best + ' · ' + bestSpeed + ' km/h'; }
+  bestTxt();
+  function jump() { if (state === 'play' && jn < 2) { vy = 11; jn++; } }
+  var practice = false, cp = { dist: 0, speed: 14 }, spT = 0, spTxt = '';
+  var $home = document.getElementById('home'), $ctl = document.getElementById('ctl'), $spawnBtn = document.getElementById('spawnBtn'), $chars = document.getElementById('chars');
+  function buildChars() {
+    $chars.innerHTML = '';
+    CHARS.forEach(function (ch, i) {
+      var b = document.createElement('button'); b.className = 'ch' + (i === charIdx ? ' sel' : '');
+      var d = document.createElement('span'); d.className = 'dot';
+      d.style.background = '#' + ('000000' + ch.color.toString(16)).slice(-6); d.style.boxShadow = '0 0 10px ' + d.style.background;
+      b.appendChild(d); b.appendChild(document.createTextNode(ch.name));
+      b.addEventListener('click', function () { setChar(i); buildChars(); });
+      $chars.appendChild(b);
+    });
+  }
+  buildChars();
+  function goHome() { state = 'home'; clearItems(); warnEl.textContent = ''; $msg.style.display = 'none'; $ctl.style.display = 'none'; $pause.style.display = 'none'; $home.style.display = 'flex'; }
+  function begin(p) {
+    practice = p; cp = { dist: 0, speed: 14 }; $home.style.display = 'none'; $spawnBtn.style.display = p ? '' : 'none';
+    start();
+    if (p) { spT = 2.5; spTxt = 'PRACTICE MODE'; }
+  }
+  function respawn() {
+    clearItems(); dist = cp.dist; lvl = Math.min(50, 1 + Math.floor(dist / 400)); speed = cp.speed;
+    jy = 0; vy = 0; jn = 0; nextSpawn = 30; eph = 'none'; eclT = 20; ephT = 0; spT = 1.5; spTxt = 'RESPAWNED';
+  }
+  document.getElementById('play').addEventListener('click', function () { begin(false); });
+  document.getElementById('prac').addEventListener('click', function () { begin(true); });
+  document.getElementById('menuBtn').addEventListener('click', goHome);
+  var boost = false, $pause = document.getElementById('pause'), $lvlSel = document.getElementById('lvlSel'), $lvlVal = document.getElementById('lvlVal'), $lvlBox = document.getElementById('lvlBox');
+  function lvlLabel() { $lvlVal.textContent = $lvlSel.value + ' · ' + tier(+$lvlSel.value); }
+  $lvlSel.addEventListener('input', lvlLabel);
+  function togglePause() {
+    if (state === 'play') { state = 'pause'; boost = false; $lvlSel.value = lvl; lvlLabel(); $lvlBox.style.display = practice ? '' : 'none'; $pause.style.display = 'flex'; }
+    else if (state === 'pause') resume();
+  }
+  function resume() {
+    $pause.style.display = 'none';
+    var sel = +$lvlSel.value;
+    if (practice && sel !== lvl) { clearItems(); lvl = sel; dist = (sel - 1) * 400; speed = lvlSpeed(sel); jy = 0; vy = 0; jn = 0; nextSpawn = 30; eph = 'none'; eclT = 20; ephT = 0; lvlT = 2.5; cp = { dist: dist, speed: speed }; }
+    state = 'play';
+  }
+  document.getElementById('resume').addEventListener('click', resume);
+  document.getElementById('homeP').addEventListener('click', goHome);
+  addEventListener('keyup', function (e) { if (e.key === 'Shift') boost = false; });
+  addEventListener('blur', function () { boost = false; });
+  document.getElementById('homeb').addEventListener('click', goHome);
+  $spawnBtn.addEventListener('click', function () { if (state === 'play') { cp = { dist: dist, speed: speed }; spT = 1.5; spTxt = 'SPAWN POINT SET'; } });
+  document.addEventListener('click', function (e) { if (e.target.tagName === 'BUTTON') e.target.blur(); });
+  function dif(l) { return (l - 1) / 49; }
+  function lvlSpeed(l) { return l <= 15 ? 14 + (l - 1) * 12 / 14 : 26 + (l - 15) * 34 / 35; }
+  function tier(l) { return l < 10 ? 'EASY' : l < 25 ? 'MEDIUM' : l < 40 ? 'HARD' : 'ULTRA HARD'; }
+  function clearItems() { items.forEach(function (o) { scene.remove(o.mesh); }); items = []; }
+
+  function start() {
+    clearItems();
+    speed = 14; dist = 0; orbs = 0; lane = 1; nextSpawn = 0; ship.position.x = 0;
+    $ctl.style.display = 'flex'; lvl = 1; lvlT = 2.5; maxSp = 0; vy = 0; jy = 0; jn = 0; eph = 'none'; eclT = 18 + Math.random() * 10; ephT = 0;
+    state = 'play'; $msg.style.display = 'none';
+  }
+
+  function spawn(z0) {
+    z0 = z0 || -110;
+    if (lvl >= 3 && Math.random() < 0.1 + 0.15 * dif(lvl)) {
+      var w = new THREE.Mesh(wallGeo, wallMat);
+      w.add(new THREE.LineSegments(wallEdge, wallLine));
+      w.position.set(0, 1.8, z0);
+      scene.add(w); items.push({ mesh: w, lane: -1, type: 'wall' });
+      return;
+    }
+    var blocked = [0, 1, 2].sort(function () { return Math.random() - 0.5; });
+    var n = Math.random() < 0.2 + 0.5 * dif(lvl) ? 2 : 1;
+    for (var k = 0; k < n; k++) {
+      var m = makeObs();
+      m.position.set(LANES[blocked[k]], m.userData.y, z0);
+      scene.add(m); items.push({ mesh: m, lane: blocked[k], type: 'box' });
+    }
+    if (n === 1 && Math.random() < 0.7) {
+      var o = new THREE.Mesh(orbGeo, orbMat);
+      o.position.set(LANES[blocked[1]], 0.9, z0);
+      scene.add(o); items.push({ mesh: o, lane: blocked[1], type: 'orb' });
+    }
+  }
+
+  function die() {
+    if (practice) { respawn(); return; }
+    state = 'over';
+    var s = Math.floor(dist / 10) + orbs * 10;
+    if (s > best) { best = s; try { localStorage.setItem('neonRunnerBest', best); } catch (e) {} }
+    var ts = Math.round(maxSp * 8);
+    if (ts > bestSpeed) { bestSpeed = ts; try { localStorage.setItem('neonRunnerBestSpeed', bestSpeed); } catch (e) {} }
+    $best.textContent = 'BEST ' + best;
+    bestTxt(); warnEl.textContent = ''; $ctl.style.display = 'none'; $title.textContent = 'CRASHED';
+    if ($msgLogo) $msgLogo.style.display = 'block';
+    $sub.textContent = 'Score ' + s + ' · Level ' + lvl + '/50 (' + tier(lvl) + ') · Top speed ' + ts + ' km/h · Orbs ' + orbs;
+    $go.textContent = 'RETRY'; $msg.style.display = 'flex';
+  }
+
+  function move(d) { if (state === 'play') lane = Math.max(0, Math.min(2, lane + d)); }
+  addEventListener('keydown', function (e) {
+    var k = e.key.toLowerCase();
+    if (k === 'arrowleft' || k === 'a') move(-1);
+    else if (k === 'arrowright' || k === 'd') move(1);
+    else if (k === 'shift') boost = true;
+    else if (k === 'escape') togglePause();
+    else if (k === 'arrowup' || k === 'w') jump();
+    else if (k === ' ' || k === 'enter') { if (state === 'play') jump(); else if (state === 'over') start(); }
+  });
+  renderer.domElement.addEventListener('pointerdown', function (e) { py = e.clientY; });
+  renderer.domElement.addEventListener('pointerup', function (e) { if (py - e.clientY > 40) jump(); else move(e.clientX < innerWidth / 2 ? -1 : 1); });
+  $go.addEventListener('click', start);
+
+  // ============================================================
+  // LOOP
+  // ============================================================
+  var last = performance.now();
+  function loop(t) {
+    requestAnimationFrame(loop);
+    var dt = Math.min((t - last) / 1000, 0.05); last = t;
+    var v = state === 'play' ? speed : 4;
+
+    // Scroll floor
+    tex.offset.y += v * dt / 3.5 * (40 / 40);
+
+    // Tunnel wall scroll
+    if (tunnelMesh && tunnelMesh.visible) {
+      tunnelMesh.material.map.offset.y = (tunnelMesh.material.map.offset.y + v * dt * 0.02) % 1;
+    }
+
+    // Rings
+    rings.forEach(function (r) { if (r.visible) { r.position.z += v * dt; if (r.position.z > 6) r.position.z -= 112; } });
+
+    // Engine glow flicker (spaceship model exhaust)
+    var eg = ship.getObjectByName('engineGlow');
+    if (eg) { var p = 0.55 + 0.35 * Math.sin(t / 40); eg.scale.setScalar(p); eg.material.opacity = p; }
+
+    // Ship animations
+    if (shipMixer) shipMixer.update(dt);
+    // idle hover/banking animation for the glb ship
+    ship.rotation.x = Math.sin(t / 300) * 0.06;
+
+    // Ship
+    ship.position.x += (LANES[lane == null ? 1 : lane] - ship.position.x) * Math.min(1, dt * 14);
+    ship.rotation.z = (ship.position.x - (LANES[lane == null ? 1 : lane])) * 0.4;
+    ship.position.y = 0.7 + jy + Math.sin(t / 200) * 0.05;
+
+    // Eclipse darkness
+    var mp = eph === 'warn' ? 1 - ephT / 3 : eph === 'on' ? 1 : eph === 'out' ? ephT / 2 : 0;
+    dark += ((eph === 'on' ? 1 : 0) - dark) * Math.min(1, dt * 2);
+    moon.position.x = -26 * (1 - mp); corona.material.opacity = mp * 0.9;
+
+    // Fog per map
+    if (mapType === 'tunnel' && scene.fog) {
+      scene.fog.near = 12 - 8 * dark;
+      scene.fog.far = 70 - 40 * dark;
+    } else if (scene.fog) {
+      scene.fog.near = 20 - 14 * dark;
+      scene.fog.far = 95 - 57 * dark;
+    }
+
+    if (state === 'play') {
+      speed += (lvlSpeed(lvl) * (boost ? 1.5 : 1) - speed) * Math.min(1, dt * (boost ? 4 : 1.5)); dist += speed * dt; maxSp = Math.max(maxSp, speed);
+      vy -= 30 * dt; jy += vy * dt; if (jy <= 0) { jy = 0; vy = 0; jn = 0; }
+      var nl = Math.min(50, 1 + Math.floor(dist / 400));
+      if (nl > lvl) { lvl = nl; lvlT = 2.5; }
+      if (eph === 'none') { if (lvl >= 5) eclT -= dt; if (eclT <= 0) { eph = 'warn'; ephT = 3; } }
+      else { ephT -= dt; if (ephT <= 0) { if (eph === 'warn') { eph = 'on'; ephT = 7; } else if (eph === 'on') { eph = 'out'; ephT = 2; } else { eph = 'none'; eclT = 26 - 14 * dif(lvl) + Math.random() * 8; } } }
+      nextSpawn -= speed * dt;
+      if (nextSpawn <= 0) { spawn(); var d = dif(lvl); if (Math.random() < 0.15 + 0.5 * d) spawn(-119); nextSpawn = 16 - 9 * d + Math.random() * (6 - 3 * d); }
+      for (var i = items.length - 1; i >= 0; i--) {
+        var o = items[i]; o.mesh.position.z += speed * dt;
+        if (o.type === 'orb') o.mesh.rotation.y += dt * 4; else if (o.mesh.userData.spin) o.mesh.rotation.y += dt * o.mesh.userData.spin; else o.mesh.rotation.y = 0;
+        var hit = Math.abs(o.mesh.position.z) < 1.1 && (o.type === 'wall' ? jy < 2.5 : o.lane === lane && (o.type === 'orb' || jy < 1.2));
+        if (hit && o.type === 'box') { die(); break; }
+        if (hit && o.type === 'orb') { orbs++; scene.remove(o.mesh); items.splice(i, 1); continue; }
+        if (o.mesh.position.z > 8) { scene.remove(o.mesh); items.splice(i, 1); }
+      }
+      $score.textContent = 'SCORE ' + (Math.floor(dist / 10) + orbs * 10);
+      $lvl.textContent = 'LVL ' + lvl + '/50 · ' + tier(lvl) + ' · ' + Math.round(speed * 8) + ' km/h';
+      var wallNear = items.some(function (o) { return o.type === 'wall' && o.mesh.position.z > -50 && o.mesh.position.z < -8; });
+      var txt = '';
+      if (spT > 0) { spT -= dt; txt = spTxt; }
+      else if (lvlT > 0) { lvlT -= dt; txt = 'LEVEL ' + lvl + ' · ' + tier(lvl); }
+      else if (eph === 'warn') txt = '⚠ ECLIPSE INCOMING ⚠';
+      else if (eph === 'on') txt = 'ECLIPSE · LOW VISIBILITY';
+      else if (wallNear) txt = '⬆ DOUBLE JUMP ⬆';
+      warnEl.textContent = txt;
+      warnEl.style.color = (lvlT > 0 || spT > 0) ? '#00f0ff' : '#ff2a6d';
+      warnEl.style.opacity = !txt ? 0 : (eph === 'warn' && lvlT <= 0 && Math.floor(t / 250) % 2 ? 0.35 : 1);
+    }
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(loop);
+
+  // ============================================================
+  // AUTO-LAUNCH FROM MENU
+  // ============================================================
+  if (launchMode === 'play') {
+    begin(false);
+  } else if (launchMode === 'practice') {
+    begin(true);
+  }
+})();
+</script>
+</body>
+</html>
